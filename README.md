@@ -84,7 +84,7 @@ kubectl krew install kanvas-snapshot
 1. Download the release binary for your platform from [Releases](https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases).
 2. Extract the archive and ensure `kubectl-kanvas-snapshot` is on your `$PATH`:
    ```bash
-   tar -xzf kubectl-kanvas-snapshot_*.tar.gz
+   tar -xzf kubectl-kanvas-snapshot_*.tar.gz --strip-components=1
    chmod +x kubectl-kanvas-snapshot
    sudo mv kubectl-kanvas-snapshot /usr/local/bin/
    ```

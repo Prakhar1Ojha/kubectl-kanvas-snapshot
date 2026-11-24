@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestIsValidEmail(t *testing.T) {
@@ -126,9 +127,12 @@ func TestAggregateManifests(t *testing.T) {
 	}
 
 	// Test multiple files
-	combined, _, err := AggregateManifests([]string{file1, file2})
+	combined, multiName, err := AggregateManifests([]string{file1, file2})
 	if err != nil {
 		t.Fatalf("AggregateManifests multiple files failed: %v", err)
+	}
+	if multiName != "manifest.yaml" {
+		t.Errorf("unexpected multi-file aggregate name: got %q, want %q", multiName, "manifest.yaml")
 	}
 	combinedStr := string(combined)
 	if !strings.Contains(combinedStr, "nginx-deployment") || !strings.Contains(combinedStr, "nginx-service") {
@@ -139,13 +143,40 @@ func TestAggregateManifests(t *testing.T) {
 	}
 
 	// Test directory
-	dirCombined, _, err := AggregateManifests([]string{tmpDir})
+	dirCombined, dirName, err := AggregateManifests([]string{tmpDir})
 	if err != nil {
 		t.Fatalf("AggregateManifests directory failed: %v", err)
+	}
+	if dirName != "manifest.yaml" {
+		t.Errorf("unexpected directory aggregate name: got %q, want %q", dirName, "manifest.yaml")
 	}
 	dirCombinedStr := string(dirCombined)
 	if !strings.Contains(dirCombinedStr, "nginx-deployment") || !strings.Contains(dirCombinedStr, "nginx-service") {
 		t.Errorf("directory scan missing resources: %s", dirCombinedStr)
+	}
+}
+
+func TestDownloadAssetWithRetry(t *testing.T) {
+	tmpDir := t.TempDir()
+	destFile := filepath.Join(tmpDir, "sub", "output.png")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("fake-png-data"))
+	}))
+	defer server.Close()
+
+	err := DownloadAssetWithRetry(server.URL, destFile, 2, 10*time.Millisecond)
+	if err != nil {
+		t.Fatalf("DownloadAssetWithRetry failed: %v", err)
+	}
+
+	content, err := os.ReadFile(destFile)
+	if err != nil {
+		t.Fatalf("failed to read downloaded file: %v", err)
+	}
+	if string(content) != "fake-png-data" {
+		t.Errorf("unexpected content: got %q, want %q", string(content), "fake-png-data")
 	}
 }
 

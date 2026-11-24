@@ -1,4 +1,4 @@
-apiVersion: krew.cncf.io/v1alpha2
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
 kind: Plugin
 metadata:
   name: kanvas-snapshot
@@ -28,61 +28,66 @@ spec:
       kubectl kanvas-snapshot -f ./manifest.yaml -e user@example.com --name my-app
   platforms:
   - selector:
-      os: darwin
-      arch: amd64
-    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .TagName }}_Darwin_x86_64.tar.gz
+      matchLabels:
+        os: darwin
+        arch: amd64
+    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .Version }}_Darwin_x86_64.tar.gz
     sha256: {{ .SHA256 }}
     bin: kubectl-kanvas-snapshot
     files:
     - from: "**/kubectl-kanvas-snapshot"
       to: "."
-    - from: "LICENSE"
+    - from: "**/LICENSE"
       to: "."
 
   - selector:
-      os: darwin
-      arch: arm64
-    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .TagName }}_Darwin_arm64.tar.gz
+      matchLabels:
+        os: darwin
+        arch: arm64
+    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .Version }}_Darwin_arm64.tar.gz
     sha256: {{ .SHA256 }}
     bin: kubectl-kanvas-snapshot
     files:
     - from: "**/kubectl-kanvas-snapshot"
       to: "."
-    - from: "LICENSE"
+    - from: "**/LICENSE"
       to: "."
 
   - selector:
-      os: linux
-      arch: amd64
-    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .TagName }}_Linux_x86_64.tar.gz
+      matchLabels:
+        os: linux
+        arch: amd64
+    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .Version }}_Linux_x86_64.tar.gz
     sha256: {{ .SHA256 }}
     bin: kubectl-kanvas-snapshot
     files:
     - from: "**/kubectl-kanvas-snapshot"
       to: "."
-    - from: "LICENSE"
+    - from: "**/LICENSE"
       to: "."
 
   - selector:
-      os: linux
-      arch: arm64
-    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .TagName }}_Linux_arm64.tar.gz
+      matchLabels:
+        os: linux
+        arch: arm64
+    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .Version }}_Linux_arm64.tar.gz
     sha256: {{ .SHA256 }}
     bin: kubectl-kanvas-snapshot
     files:
     - from: "**/kubectl-kanvas-snapshot"
       to: "."
-    - from: "LICENSE"
+    - from: "**/LICENSE"
       to: "."
 
   - selector:
-      os: windows
-      arch: amd64
-    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .TagName }}_Windows_x86_64.zip
+      matchLabels:
+        os: windows
+        arch: amd64
+    uri: https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases/download/{{ .TagName }}/kubectl-kanvas-snapshot_{{ .Version }}_Windows_x86_64.zip
     sha256: {{ .SHA256 }}
     bin: kubectl-kanvas-snapshot.exe
     files:
     - from: "**/kubectl-kanvas-snapshot.exe"
       to: "."
-    - from: "LICENSE"
+    - from: "**/LICENSE"
       to: "."

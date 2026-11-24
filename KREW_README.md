@@ -39,7 +39,7 @@ If you prefer not to use Krew:
 1. Download the latest binary archive for your OS/architecture from [Releases](https://github.com/meshery-extensions/kubectl-kanvas-snapshot/releases).
 2. Extract the archive:
    ```bash
-   tar -xzf kubectl-kanvas-snapshot_*.tar.gz
+   tar -xzf kubectl-kanvas-snapshot_*.tar.gz --strip-components=1
    ```
 3. Move `kubectl-kanvas-snapshot` into your `$PATH` (e.g. `/usr/local/bin`):
    ```bash

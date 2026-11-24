@@ -97,6 +97,14 @@ Flags:
 		firstFile := manifestFiles[0]
 		isRemoteURL := IsURL(firstFile)
 
+		// Reject mixing a remote URL with additional inputs: AggregateManifests
+		// cannot os.Stat a URL as a local path, so catch this combination here.
+		if isRemoteURL && len(manifestFiles) > 1 {
+			err := fmt.Errorf("cannot mix a remote URL with additional -f inputs; use a single -f <url> or local paths only")
+			handleError(err)
+			return err
+		}
+
 		if designName == "" {
 			if isRemoteURL {
 				designName = ExtractNameFromURI(firstFile)
@@ -111,8 +119,8 @@ Flags:
 		var designID string
 		var err error
 
-		if isRemoteURL && len(manifestFiles) == 1 {
-			// Remote URL Import
+		if isRemoteURL {
+			// Remote URL Import (single URL only, enforced above)
 			designID, err = CreateMesheryDesignFromURL(firstFile, designName, email)
 			if err != nil {
 				handleError(errors.ErrCreatingMesheryDesign(err))
@@ -134,14 +142,19 @@ Flags:
 
 		assetLocation := fmt.Sprintf("https://raw.githubusercontent.com/layer5labs/meshery-extensions-packages/master/action-assets/kubectl-plugin-assets/%s.png", designID)
 
-		if WorkflowAccessToken != "" {
-			err = GenerateSnapshot(designID, assetLocation, email, WorkflowAccessToken)
-			if err != nil {
-				Log.Warnf("Workflow dispatch notice: %v", err)
-			}
+		// Snapshot dispatch: require a valid token and a successful dispatch before
+		// reporting success. A missing token or failed dispatch is a hard error.
+		if WorkflowAccessToken == "" {
+			err = fmt.Errorf("GH_ACCESS_TOKEN (or GITHUB_TOKEN) is not set; snapshot generation requires a GitHub personal access token with workflow permissions")
+			handleError(err)
+			return err
+		}
+		if err = GenerateSnapshot(designID, assetLocation, email, WorkflowAccessToken); err != nil {
+			handleError(err)
+			return err
 		}
 
-		Log.Infof("\n✓ Design created successfully! Design ID: %s", designID)
+		Log.Infof("\n✓ Design created and snapshot queued successfully! Design ID: %s", designID)
 		Log.Infof("Snapshot URL: %s", assetLocation)
 		Log.Infof("It may take 1-3 minutes for the Kanvas snapshot to render at the above URL.")
 
@@ -222,7 +235,8 @@ func IsValidEmail(e string) bool {
 // AggregateManifests reads single/multiple files, directories, or stdin into a combined YAML document
 func AggregateManifests(paths []string) ([]byte, string, error) {
 	var combined bytes.Buffer
-	derivedName := "manifest.yaml"
+	fileCount := 0
+	lastFileName := ""
 
 	for _, p := range paths {
 		if p == "-" {
@@ -232,6 +246,8 @@ func AggregateManifests(paths []string) ([]byte, string, error) {
 				return nil, "", fmt.Errorf("failed to read from stdin: %w", err)
 			}
 			appendYAMLDocument(&combined, data)
+			fileCount++
+			lastFileName = "stdin-manifest.yaml"
 			continue
 		}
 
@@ -256,6 +272,8 @@ func AggregateManifests(paths []string) ([]byte, string, error) {
 						return rErr
 					}
 					appendYAMLDocument(&combined, content)
+					fileCount++
+					lastFileName = filepath.Base(path)
 				}
 				return nil
 			})
@@ -268,13 +286,19 @@ func AggregateManifests(paths []string) ([]byte, string, error) {
 			if rErr != nil {
 				return nil, "", fmt.Errorf("failed to read file %s: %w", p, rErr)
 			}
-			derivedName = filepath.Base(p)
 			appendYAMLDocument(&combined, content)
+			fileCount++
+			lastFileName = filepath.Base(p)
 		}
 	}
 
 	if combined.Len() == 0 {
 		return nil, "", fmt.Errorf("no manifest content found in the provided path(s)")
+	}
+
+	derivedName := "manifest.yaml"
+	if fileCount == 1 && lastFileName != "" {
+		derivedName = lastFileName
 	}
 
 	return combined.Bytes(), derivedName, nil
@@ -402,21 +426,46 @@ func GenerateSnapshot(contentID, assetLocation, email, workflowAccessToken strin
 	return nil
 }
 
-// DownloadAssetWithRetry attempts to download the snapshot image with retry intervals
+// DownloadAssetWithRetry attempts to download the snapshot image with retry intervals.
+// Writes to a temporary file in the destination directory and renames on completion
+// to prevent leaving partial or corrupt files on interrupted downloads.
 func DownloadAssetWithRetry(url, destPath string, attempts int, interval time.Duration) error {
 	client := &http.Client{Timeout: 15 * time.Second}
+
+	destDir := filepath.Dir(destPath)
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return err
+	}
 
 	for i := 1; i <= attempts; i++ {
 		resp, err := client.Get(url)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			defer resp.Body.Close()
-			out, cErr := os.Create(destPath)
+			tmpFile, cErr := os.CreateTemp(destDir, "snapshot-download-*.tmp")
 			if cErr != nil {
+				resp.Body.Close()
 				return cErr
 			}
-			defer out.Close()
-			_, err = io.Copy(out, resp.Body)
-			return err
+			tmpPath := tmpFile.Name()
+
+			_, copyErr := io.Copy(tmpFile, resp.Body)
+			resp.Body.Close()
+			closeErr := tmpFile.Close()
+
+			if copyErr != nil {
+				_ = os.Remove(tmpPath)
+				return copyErr
+			}
+			if closeErr != nil {
+				_ = os.Remove(tmpPath)
+				return closeErr
+			}
+
+			if renameErr := os.Rename(tmpPath, destPath); renameErr != nil {
+				_ = os.Remove(tmpPath)
+				return renameErr
+			}
+
+			return nil
 		}
 		if resp != nil {
 			resp.Body.Close()
