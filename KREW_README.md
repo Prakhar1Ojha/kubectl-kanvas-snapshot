@@ -41,15 +41,28 @@ If you prefer not to use Krew:
    ```bash
    tar -xzf kubectl-kanvas-snapshot_*.tar.gz --strip-components=1
    ```
-3. Move `kubectl-kanvas-snapshot` into your `$PATH` (e.g. `/usr/local/bin`):
+3. Move `kubectl-kanvas-snapshot` into your `$PATH` as `kubectl-kanvas_snapshot` (e.g. `/usr/local/bin`), so `kubectl` discovers it as the `kanvas-snapshot` plugin:
    ```bash
    chmod +x kubectl-kanvas-snapshot
-   sudo mv kubectl-kanvas-snapshot /usr/local/bin/
+   sudo mv kubectl-kanvas-snapshot /usr/local/bin/kubectl-kanvas_snapshot
    ```
 4. Verify installation:
    ```bash
    kubectl kanvas-snapshot --help
    ```
+
+---
+
+## Prerequisites & Authentication
+
+Snapshot rendering is dispatched via GitHub Actions workflows and requires a GitHub personal access token with workflow permissions:
+```bash
+export GH_ACCESS_TOKEN="<your-github-pat>"
+# or
+export GITHUB_TOKEN="<your-github-pat>"
+```
+
+> **Note:** The `--token` flag configures the Meshery provider authentication token (`PROVIDER_TOKEN`), which authenticates design imports to Meshery Cloud / Playground. It does not replace the `GH_ACCESS_TOKEN` / `GITHUB_TOKEN` requirement used for workflow dispatch.
 
 ---
 

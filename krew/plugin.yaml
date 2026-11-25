@@ -26,6 +26,11 @@ spec:
 
       # Generate snapshot and receive notification by email
       kubectl kanvas-snapshot -f ./manifest.yaml -e user@example.com --name my-app
+
+    AUTHENTICATION:
+      Snapshot generation dispatches rendering workflows and requires GH_ACCESS_TOKEN
+      or GITHUB_TOKEN set in your environment. The --token flag sets the Meshery
+      provider token and does not replace the GitHub workflow token requirement.
   platforms:
   - selector:
       matchLabels:

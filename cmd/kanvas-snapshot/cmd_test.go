@@ -158,25 +158,76 @@ func TestAggregateManifests(t *testing.T) {
 
 func TestDownloadAssetWithRetry(t *testing.T) {
 	tmpDir := t.TempDir()
-	destFile := filepath.Join(tmpDir, "sub", "output.png")
+	destDir := filepath.Join(tmpDir, "sub")
+	destFile := filepath.Join(destDir, "output.png")
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("fake-png-data"))
+	// Pre-create destination with existing content to verify atomic overwrite/preservation
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		t.Fatalf("failed to create destDir: %v", err)
+	}
+	initialContent := []byte("original-unmodified-content")
+	if err := os.WriteFile(destFile, initialContent, 0o644); err != nil {
+		t.Fatalf("failed to write initial destFile: %v", err)
+	}
+
+	// 1. Verify that a failed download preserves existing destination content and cleans up any temp files
+	failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	defer server.Close()
+	defer failServer.Close()
 
-	err := DownloadAssetWithRetry(server.URL, destFile, 2, 10*time.Millisecond)
+	failErr := DownloadAssetWithRetry(failServer.URL, destFile, 2, 10*time.Millisecond)
+	if failErr == nil {
+		t.Fatal("expected DownloadAssetWithRetry to fail on 500 status, got nil")
+	}
+
+	persistedContent, err := os.ReadFile(destFile)
 	if err != nil {
+		t.Fatalf("failed to read destFile after failure: %v", err)
+	}
+	if string(persistedContent) != string(initialContent) {
+		t.Errorf("destFile was modified on failure: got %q, want %q", string(persistedContent), string(initialContent))
+	}
+
+	// Verify no leftover .tmp files
+	entries, err := os.ReadDir(destDir)
+	if err != nil {
+		t.Fatalf("failed to read destDir: %v", err)
+	}
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".tmp") {
+			t.Errorf("found leftover temporary download file: %s", entry.Name())
+		}
+	}
+
+	// 2. Verify that a successful download atomically overwrites destination with new content
+	successServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("new-downloaded-png-data"))
+	}))
+	defer successServer.Close()
+
+	if err := DownloadAssetWithRetry(successServer.URL, destFile, 2, 10*time.Millisecond); err != nil {
 		t.Fatalf("DownloadAssetWithRetry failed: %v", err)
 	}
 
-	content, err := os.ReadFile(destFile)
+	updatedContent, err := os.ReadFile(destFile)
 	if err != nil {
 		t.Fatalf("failed to read downloaded file: %v", err)
 	}
-	if string(content) != "fake-png-data" {
-		t.Errorf("unexpected content: got %q, want %q", string(content), "fake-png-data")
+	if string(updatedContent) != "new-downloaded-png-data" {
+		t.Errorf("unexpected content: got %q, want %q", string(updatedContent), "new-downloaded-png-data")
+	}
+
+	// Verify no leftover .tmp files after successful download
+	entries, err = os.ReadDir(destDir)
+	if err != nil {
+		t.Fatalf("failed to read destDir: %v", err)
+	}
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".tmp") {
+			t.Errorf("found leftover temporary download file: %s", entry.Name())
+		}
 	}
 }
 

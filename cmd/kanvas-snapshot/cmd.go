@@ -116,6 +116,14 @@ Flags:
 			Log.Warnf("No design name provided. Using derived name: %s", designName)
 		}
 
+		// Snapshot dispatch: require a valid token up front before importing designs,
+		// so a missing credential returns an immediate error without saving a design.
+		if WorkflowAccessToken == "" {
+			err := fmt.Errorf("GH_ACCESS_TOKEN (or GITHUB_TOKEN) is not set; snapshot generation requires a GitHub personal access token with workflow permissions")
+			handleError(err)
+			return err
+		}
+
 		var designID string
 		var err error
 
@@ -142,13 +150,7 @@ Flags:
 
 		assetLocation := fmt.Sprintf("https://raw.githubusercontent.com/layer5labs/meshery-extensions-packages/master/action-assets/kubectl-plugin-assets/%s.png", designID)
 
-		// Snapshot dispatch: require a valid token and a successful dispatch before
-		// reporting success. A missing token or failed dispatch is a hard error.
-		if WorkflowAccessToken == "" {
-			err = fmt.Errorf("GH_ACCESS_TOKEN (or GITHUB_TOKEN) is not set; snapshot generation requires a GitHub personal access token with workflow permissions")
-			handleError(err)
-			return err
-		}
+		// Dispatch workflow for snapshot generation
 		if err = GenerateSnapshot(designID, assetLocation, email, WorkflowAccessToken); err != nil {
 			handleError(err)
 			return err
